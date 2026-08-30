@@ -1,0 +1,16 @@
+node_modules/
+dist/
+*.log
+.env
+.env.*
+!.env.example
+.DS_Store
+
+# MaxMind GeoLite2 database is downloaded at build time, never committed.
+geodata/*.mmdb
+geodata/*.tar.gz
+
+# Never commit service-account keys — Cloud Run uses Workload Identity (task 1.7).
+*serviceaccount*.json
+*-key.json
+gcp-key*.json
