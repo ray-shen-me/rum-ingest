@@ -21,7 +21,8 @@ const textBody = express.text({ type: '*/*', limit: '16kb' });
 const jsonBody = express.json({ limit: '16kb' });
 
 // Health check (Cloud Run readiness).
-app.get('/healthz', (_req, res) => {
+// Note: /healthz is intercepted by GFE on Cloud Run domain mappings; use /health instead.
+app.get('/health', (_req, res) => {
   res.status(200).json({ ok: true });
 });
 
