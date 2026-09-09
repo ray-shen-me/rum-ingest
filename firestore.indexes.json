@@ -1,0 +1,34 @@
+{
+  "//": "Composite indexes for rum-ingest query patterns (task 2.3, design D5).",
+  "indexes": [
+    {
+      "//": "Sessions by site + time: the per-day session scan (rollup & metrics).",
+      "collectionGroup": "sessions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "site_id", "order": "ASCENDING" },
+        { "fieldPath": "first_seen", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "//": "Events by session + type: per-session drill-down / reclassification.",
+      "collectionGroup": "events",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "session_id", "order": "ASCENDING" },
+        { "fieldPath": "type", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "//": "Events by site + type + time: the per-day funnel/click scan.",
+      "collectionGroup": "events",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "site_id", "order": "ASCENDING" },
+        { "fieldPath": "type", "order": "ASCENDING" },
+        { "fieldPath": "at", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
