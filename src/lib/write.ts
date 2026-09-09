@@ -96,7 +96,10 @@ export async function writeBeacon(p: BeaconPayload, meta: RequestMeta): Promise<
   const batch = database.batch();
 
   // --- Pageview upsert (per page load; reloads are distinct pvids, D5) ---
-  if (p.t === 'pageview' || p.t === 'flush') {
+  // pageview: write the full doc including entered_at (the true page-load time).
+  // flush:    update only engaged_ms and max_section — never touch entered_at,
+  //           and never write null over a previously stored max_section (findings 2 & 9).
+  if (p.t === 'pageview') {
     const pvRef = database.collection('pageviews').doc(`${p.site}__${p.pvid}`);
     const pv: PageviewDoc = {
       pageview_id: p.pvid,
@@ -107,8 +110,18 @@ export async function writeBeacon(p: BeaconPayload, meta: RequestMeta): Promise<
       engaged_ms: p.engaged_ms ?? 0,
       max_section: p.max_section ?? null,
     };
-    // merge so a start beacon creates it and a later flush updates engaged/max.
-    batch.set(pvRef, pv, { merge: true });
+    batch.set(pvRef, pv);
+  } else if (p.t === 'flush') {
+    const pvRef = database.collection('pageviews').doc(`${p.site}__${p.pvid}`);
+    // Only update the fields that a flush can legitimately advance.
+    // mergeFields ensures all other fields (entered_at, session_id, etc.) are untouched.
+    const updates: Partial<PageviewDoc> = { engaged_ms: p.engaged_ms ?? 0 };
+    const mergeFields: string[] = ['engaged_ms'];
+    if (p.max_section != null) {
+      updates.max_section = p.max_section;
+      mergeFields.push('max_section');
+    }
+    batch.set(pvRef, updates, { mergeFields });
   }
 
   // --- section_view events (batched on flush) ---

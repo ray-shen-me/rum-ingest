@@ -7,9 +7,11 @@
 //   - the current UTC day                -> always live-compute, never persist
 // Only day(s) missing a rollup are ever live-computed on a load (D16 layer 1).
 
-import { db, Timestamp } from '../firestore.js';
+import { Timestamp } from '../firestore.js';
 import { config } from '../config.js';
 import { aggregateDay, mergeHuman, mergeBot, emptyHuman } from './aggregate.js';
+import { rollupRef } from './rollup.js';
+import { getSiteSections } from '../validate.js';
 import { dateRange, todayKey } from './dates.js';
 import type {
   DayAggregate,
@@ -17,19 +19,7 @@ import type {
   MetricsDay,
   MetricsResponse,
   RollupDoc,
-  SiteDoc,
 } from '../types.js';
-
-async function getSectionsOrder(siteId: string): Promise<string[]> {
-  const doc = await db().collection('sites').doc(siteId).get();
-  if (!doc.exists) return [];
-  const data = doc.data() as SiteDoc;
-  return Array.isArray(data.sections) ? data.sections : [];
-}
-
-function rollupRef(siteId: string, dateKey: string) {
-  return db().collection('rollups').doc(siteId).collection('daily').doc(dateKey);
-}
 
 async function readRollup(
   siteId: string,
@@ -97,15 +87,18 @@ export async function buildMetrics(
   to: string,
   includeBots: boolean,
 ): Promise<MetricsResponse> {
-  const sectionsOrder = await getSectionsOrder(siteId);
+  // Use the TTL-cached sections from validate.ts instead of a raw Firestore read
+  // on every request (finding 5).
+  const sectionsOrder = await getSiteSections(siteId);
   const today = todayKey();
   const keys = dateRange(from, to);
 
-  const days: MetricsDay[] = [];
-  for (const key of keys) {
-    const { agg, live } = await resolveDay(siteId, key, sectionsOrder, today);
-    days.push(toMetricsDay(agg, includeBots, live));
-  }
+  // Resolve all days in parallel — independent operations, no ordering constraint.
+  // Eliminates up to 90 serial Firestore round-trips for a 30-day window (finding 7).
+  const results = await Promise.all(
+    keys.map((key) => resolveDay(siteId, key, sectionsOrder, today)),
+  );
+  const days = results.map(({ agg, live }) => toMetricsDay(agg, includeBots, live));
 
   // Totals are the sum of the per-day MetricsDay values, which already honor
   // include_bots — so the window total is consistent with each day's numbers.

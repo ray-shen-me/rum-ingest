@@ -1,6 +1,7 @@
 // Auth for /metrics (Firebase ID token) and /rollup (Cloud Scheduler OIDC).
 // Design D10 (metrics) and D14/task 5.3 (rollup).
 
+import { timingSafeEqual } from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
 import { auth } from '../firestore.js';
 import { config } from '../config.js';
@@ -66,19 +67,29 @@ export async function verifyRollupCaller(
   const token = bearer(authorization);
   if (!token) return { ok: false, status: 401, error: 'missing bearer token' };
 
-  // Manual admin token path (optional).
-  if (config.rollupAdminToken && token === config.rollupAdminToken) {
-    return { ok: true, email: 'admin-token' };
+  // Manual admin token path (optional). Use constant-time comparison to prevent
+  // timing attacks (finding 4).
+  if (config.rollupAdminToken) {
+    const expected = Buffer.from(config.rollupAdminToken);
+    const actual = Buffer.from(token);
+    if (expected.length === actual.length && timingSafeEqual(expected, actual)) {
+      return { ok: true, email: 'admin-token' };
+    }
   }
 
   // Cloud Scheduler OIDC path.
   if (!config.schedulerSaEmail) {
     return { ok: false, status: 403, error: 'rollup caller identity not configured' };
   }
+  // Audience is required — skipping it would accept any valid OIDC token
+  // from the SA regardless of intended recipient (finding 1).
+  if (!config.rollupAudience) {
+    return { ok: false, status: 403, error: 'ROLLUP_AUDIENCE not configured' };
+  }
   try {
     const ticket = await oauthClient.verifyIdToken({
       idToken: token,
-      audience: config.rollupAudience || undefined,
+      audience: config.rollupAudience,
     });
     const payload = ticket.getPayload();
     const email = payload?.email?.toLowerCase();

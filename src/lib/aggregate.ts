@@ -60,7 +60,6 @@ export async function aggregateDay(
 
   const human = emptyHuman();
   const bot = emptyBot();
-  const humanSessionIds = new Set<string>();
 
   for (const doc of sessionsSnap.docs) {
     const s = doc.data() as SessionDoc;
@@ -70,7 +69,6 @@ export async function aggregateDay(
       bump(bot.countries, s.country);
     } else {
       human.sessions += 1;
-      humanSessionIds.add(s.session_id);
       bump(human.referrers, s.referrer_host);
       bump(human.countries, s.country);
       if ((s.engaged_ms ?? 0) >= config.engagedMsThreshold) {
@@ -90,11 +88,13 @@ export async function aggregateDay(
     .where('at', '<', endTs)
     .get();
 
-  // Distinct human sessions reaching each section.
+  // Distinct sessions reaching each section.
+  // D7 guarantees bots write no event docs, so every section_view here is human.
+  // The humanSessionIds guard was removed: it dropped events from sessions that
+  // started before midnight but whose section_views fired after midnight (finding 3).
   const funnelSets = new Map<string, Set<string>>();
   for (const doc of svSnap.docs) {
     const e = doc.data() as EventDoc;
-    if (!humanSessionIds.has(e.session_id)) continue;
     let set = funnelSets.get(e.target);
     if (!set) {
       set = new Set<string>();
@@ -116,9 +116,9 @@ export async function aggregateDay(
     .where('at', '>=', startTs)
     .where('at', '<', endTs)
     .get();
+  // Same D7 reasoning: bots write no event docs, so every click here is human.
   for (const doc of clickSnap.docs) {
     const e = doc.data() as EventDoc;
-    if (!humanSessionIds.has(e.session_id)) continue;
     bump(human.clicks, e.target);
   }
 

@@ -32,6 +32,10 @@ export async function loadSites(force = false): Promise<Map<string, string[]>> {
     siteCacheAt = now;
   } catch (err) {
     console.warn(`[validate] could not refresh sites cache: ${(err as Error).message}`);
+    // If we have never successfully loaded (siteCacheAt === 0), rethrow so the
+    // route returns 500 rather than silently 400-ing all beacons as unknown sites
+    // (finding 8). On subsequent TTL refreshes the stale cache is used instead.
+    if (siteCacheAt === 0) throw err;
   }
   return siteCache;
 }

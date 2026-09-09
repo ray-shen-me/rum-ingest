@@ -23,7 +23,8 @@ export async function getSites(): Promise<SiteInfo[]> {
   });
 }
 
-function rollupRef(siteId: string, dateKey: string) {
+// Exported so metrics.ts can share the same ref builder (finding 6).
+export function rollupRef(siteId: string, dateKey: string) {
   return db().collection('rollups').doc(siteId).collection('daily').doc(dateKey);
 }
 
