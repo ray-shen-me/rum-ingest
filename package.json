@@ -12,7 +12,8 @@
     "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "seed": "tsx scripts/seed-site.ts",
-    "rollup:local": "tsx scripts/run-rollup.ts"
+    "rollup:local": "tsx scripts/run-rollup.ts",
+    "test": "node --import tsx/esm --test src/validate.test.ts src/lib/write.test.ts src/lib/aggregate.test.ts"
   },
   "dependencies": {
     "@maxmind/geoip2-node": "^5.0.0",

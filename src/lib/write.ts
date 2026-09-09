@@ -15,7 +15,7 @@ import type {
   SessionDoc,
 } from '../types.js';
 
-function furthestSection(
+export function furthestSection(
   order: string[],
   a: string | null,
   b: string | null | undefined,
