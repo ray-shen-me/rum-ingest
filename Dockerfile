@@ -12,13 +12,15 @@ RUN npm install --omit=dev --no-audit --no-fund
 
 # --- GeoLite2 City DB (task 3.2, design D6) ---
 # Bundled at build time so geo is a local lookup — no runtime network call.
-# Requires a free MaxMind license key passed as a build arg.
+# Uses a BuildKit secret so the key is never stored in image layer metadata
+# (unlike --build-arg which is visible in `docker history --no-trunc`).
+# Build with: DOCKER_BUILDKIT=1 docker build --secret id=maxmind,env=MAXMIND_LICENSE_KEY .
 FROM base AS geo
-ARG MAXMIND_LICENSE_KEY
 RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 COPY scripts/download-geolite2.sh ./scripts/download-geolite2.sh
-RUN MAXMIND_LICENSE_KEY="${MAXMIND_LICENSE_KEY}" sh scripts/download-geolite2.sh geodata
+RUN --mount=type=secret,id=maxmind,env=MAXMIND_LICENSE_KEY \
+    sh scripts/download-geolite2.sh geodata
 
 # --- Final image ---
 FROM base AS run
