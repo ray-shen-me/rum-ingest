@@ -14,7 +14,7 @@ function defaultFrom(): string {
 }
 
 export async function handleMetrics(req: Request, res: Response): Promise<void> {
-  setMetricsCors(res, config.dashOrigin);
+  setMetricsCors(req, res, config.dashOrigin);
 
   if (isPreflight(req)) {
     res.status(204).end();
